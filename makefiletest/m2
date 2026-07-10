@@ -1,0 +1,18 @@
+src = $(wildcard *.cpp)    
+obj = $(patsubst %.cpp, %.o, $(src))
+
+ALL:main
+
+main.o:main.cpp
+	g++ -c main.cpp -o main.o
+add.o:add.cpp
+	g++ -c add.cpp -o add.o
+sub.o:sub.cpp
+	g++ -c sub.cpp -o sub.o
+mul.o:mul.cpp
+	g++ -c mul.cpp -o mul.o
+main:$(obj)
+	g++ $(obj) -o main
+
+clean:
+	-rm -rf $(obj) main

@@ -1,0 +1,16 @@
+src = $(wildcard *.cpp)    
+obj = $(patsubst %.cpp, %.o, $(src))
+
+ALL:main
+myArgs =  -Wall -g
+
+$(obj):%.o:%.cpp
+	g++ -c $< -o $@ $(myArgs)
+
+main:$(obj)
+	g++ $^ -o $@ $(myArgs)
+
+clean:
+	-rm -rf $(obj) main
+
+.PHONY: clean ALL

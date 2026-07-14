@@ -18,9 +18,9 @@ int main()
 	
 	//cout << fd << endl;	
 
-	//fd = open("test3.txt", O_RDONLY);
-	//fd = open("test3.txt", O_WRONLY);	
-	//fd = open("mydir", O_WRONLY);	
+	fd = open("test3.txt", O_RDONLY);
+	fd = open("test3.txt", O_WRONLY);	
+	fd = open("mydir", O_WRONLY);	
 
 	cout << "fd=" <<  fd << " " << "errno=" << errno << ":" << strerror(errno) << endl;
 	

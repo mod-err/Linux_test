@@ -9,10 +9,14 @@
 using std::cout;
 using std::endl;
 
-void read_dir(char* argv)
+void isFile(const char* name);
+
+void read_dir(const char* dir)
 {
+    char path[256];
+
     DIR* dp;
-    dp = opendir(argv);
+    dp = opendir(dir);
 
     if(dp == NULL)
     {
@@ -23,20 +27,20 @@ void read_dir(char* argv)
     struct dirent* sdp;
     while((sdp = readdir(dp)) != NULL)
     {
-        if(strcmp(sdp->d_name, ".") || strcmp(sdp->d_name, ".."))
+        if(strcmp(sdp->d_name, ".") == 0 || strcmp(sdp->d_name, "..") == 0)
         {
             continue;
         }
-        cout << sdp->d_name << endl;
-
+        //拼接目录项和其路径
+        sprintf(path, "%s/%s", dir, sdp->d_name);
         //递归
-        read_dir(sdp->d_name);
+        isFile(path);
     }
 
     closedir(dp);
 }
 
-void isFile(char* name)
+void isFile(const char* name)
 {
     struct stat sb;
 
@@ -47,7 +51,7 @@ void isFile(char* name)
 		exit(1);
     }
 
-    //是目录文件
+    //是目录文件，递归遍历
     if(S_ISDIR(sb.st_mode))
     {
         read_dir(name);
@@ -59,7 +63,14 @@ void isFile(char* name)
 
 int main(int argc, char* argv[])
 {
-    isFile(argv[1]);
+    if(argc == 1)
+    {
+        isFile(".");
+    }
+    else
+    {
+        isFile(argv[1]);
+    }
 
     return 0;
 }

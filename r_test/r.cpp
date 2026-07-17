@@ -44,6 +44,7 @@ void isFile(const char* name)
 {
     struct stat sb;
 
+    //stat需要完整路径才可以判断文件，不能只传入文件名称，所以要拼接
     int ret = stat(name, &sb);
     if(ret == -1)
     {
@@ -63,6 +64,7 @@ void isFile(const char* name)
 
 int main(int argc, char* argv[])
 {
+    //如果用户未传入，默认访问当前路径
     if(argc == 1)
     {
         isFile(".");

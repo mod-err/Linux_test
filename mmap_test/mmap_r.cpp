@@ -50,7 +50,6 @@ int main(int argc, char* argv[])
         sleep(1);
     }
     
-    
     //回收映射的内存
     int ret = munmap(p, len);
     if(ret == -1)

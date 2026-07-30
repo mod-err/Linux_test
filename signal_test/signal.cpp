@@ -11,7 +11,7 @@ int main()
     signal(SIGINT, sig_catch);
 
     //阻塞程序，预留充足时间发信号
-    while(1);s
+    while(1);
 
     return 0;
 }

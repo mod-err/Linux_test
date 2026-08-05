@@ -12,10 +12,10 @@ void* tfn(void* arg)
 int main()
 {
     pthread_t tid;
-
-    printf("main : pid = %d, tid = %lu\n", getpid(), pthread_self());
     
     pthread_create(&tid, NULL, tfn, NULL);
+
+    printf("main : pid = %d, tid = %lu\n", getpid(), pthread_self());
 
     sleep(1);
     

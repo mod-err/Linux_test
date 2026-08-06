@@ -4,7 +4,7 @@
 #include <error.h>
 #include <string.h>
 
-void* tnf(void* arg)
+void* tfn(void* arg)
 {
     printf("thread : pid = %d, tid = %lu\n", getpid(), pthread_self());
 
@@ -16,7 +16,7 @@ int main()
     //接收子线程的线程ID
     pthread_t tid;
     
-    int ret = pthread_create(&tid, NULL, tnf, NULL);
+    int ret = pthread_create(&tid, NULL, tfn, NULL);
     if(ret != 0)
     {
         printf("thread create error : %s\n", strerror(ret));

@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
     while(1)
     {
         ret = Read(cfd, buf, sizeof(buf)); //ret保存读取到的字节数，一次调用能读多少读多少，不会超过buf的大小
-        Write(STDOUT_FILENO, buf, ret);  //在终端上显示
+        Write(STDOUT_FILENO, buf, ret);  //在终端上显示收到的数据
 
         for(int i = 0; i < ret; i++)
         {

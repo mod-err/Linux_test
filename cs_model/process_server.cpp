@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <ctype.h> 
+#include <string.h>
 #include "wrap.h"
 
 #define SERV_PORT 9527
@@ -22,6 +23,15 @@ void sig_catch(int sig)
 //实现多进程并发服务器，可以支持多个客户端连接
 int main(int argc, char* argv[])
 {
+    /*----------------------------------------------------------*/
+    //信号捕捉函数回收子进程，⭐信号注册移到循环外，只注册一次
+    struct sigaction act;
+    act.sa_handler = sig_catch; //设置回调函数
+    sigemptyset(&act.sa_mask); //清空sa_mask屏蔽字，只在sig_catch期间有效
+    act.sa_flags = 0; 
+    sigaction(SIGCHLD, &act, NULL);  //注册
+
+    /*----------------------------------------------------------*/
     pid_t pid; //进程ID
     int ret;
     char buf[4096]; //接收数据的缓冲区
@@ -32,6 +42,7 @@ int main(int argc, char* argv[])
     //各类协议万能壳
     struct sockaddr_in serv_addr, clit_addr;
     
+    bzero(&serv_addr,sizeof(serv_addr));  //⭐ 将地址结构清零，防止栈垃圾
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(SERV_PORT); //主机字节序转网络字节序
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY); //本机IP，同样转为网络字节序
@@ -48,9 +59,10 @@ int main(int argc, char* argv[])
     Listen(lfd, 128);
 
     //4.子进程用于通信，父进程监听并回收子进程
-    clit_addr_len = sizeof(clit_addr);
     while(1)
     {
+        // ⭐ 每次循环前重置长度
+        clit_addr_len = sizeof(clit_addr);
         //阻塞等待客户端连接
         cfd = Accept(lfd, (struct sockaddr *)&clit_addr, &clit_addr_len);
         //创建子进程
@@ -67,13 +79,6 @@ int main(int argc, char* argv[])
         }
         else //(3)父进程：回收子进程
         {
-            //信号捕捉函数回收子进程
-            struct sigaction act;
-            act.sa_handler = sig_catch; //设置回调函数
-            sigemptyset(&act.sa_mask); //清空sa_mask屏蔽字，只在sig_catch期间有效
-            act.sa_flags = 0; 
-            sigaction(SIGCHLD, &act, NULL);  //注册
-
             close(cfd); //关闭用于通信的套接字
             continue;
         }
@@ -90,7 +95,7 @@ int main(int argc, char* argv[])
             if(ret == 0)
             {
                 close(cfd);
-                exit(1);
+                exit(0);
             }
             Write(STDOUT_FILENO, buf, ret);  //在终端上显示收到的数据
 

@@ -7,6 +7,7 @@
 #include <ctype.h> 
 #include <string.h>
 #include <pthread.h>
+#include <error.h>
 #include "wrap.h"
 
 #define SERV_PORT 9527
@@ -16,7 +17,7 @@ void *do_work(void* arg)
 {
     int ret;
     char buf[4096]; //接收数据的缓冲区
-    struct sockaddr_in cfd = (struct sockaddr_in*)arg; //client文件描述符
+    int cfd = (int)(long)arg; //client文件描述符
 
     //子进程进行while(1)循环，直到Read返回0客户端断开才break退出
     while(1)
@@ -26,7 +27,7 @@ void *do_work(void* arg)
         if(ret == 0)
         {
             close(cfd);
-            exit(0);
+            return NULL; //线程退出用return
         }
         Write(STDOUT_FILENO, buf, ret);  //在终端上显示收到的数据
 
@@ -63,7 +64,7 @@ int main(int argc, char* argv[])
     //3.设置与服务器同时连接的客户端上限
     Listen(listenfd, 128);
 
-    //4.子进程用于通信，父进程监听并回收子进程
+    //4.子线程用于通信，主线程监听并回收子线程
     while(1)
     {
         // ⭐ 每次循环前重置长度
@@ -72,7 +73,12 @@ int main(int argc, char* argv[])
         clientfd = Accept(listenfd, (struct sockaddr *)&clit_addr, &clit_addr_len);
         
         //创建线程
-        pthread_create(&tid, NULL, do_work, (void*)&clientfd); 
+        int tmp = pthread_create(&tid, NULL, do_work, (void*)(long)clientfd);
+        //线程创建错误处理
+        if(tmp != 0)
+        {
+            printf("thread detach error : %s\n", strerror(tmp));
+        } 
         //分离子线程：线程终止会自动回收
         pthread_detach(tid);
     }

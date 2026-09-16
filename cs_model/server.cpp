@@ -26,6 +26,9 @@ int main(int argc, char* argv[])
     //1.创建socket套接字
     lfd = socket(AF_INET, SOCK_STREAM, 0); 
 
+    int opt = 1;
+    setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
     //2.绑定端口和IP
     bind(lfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 

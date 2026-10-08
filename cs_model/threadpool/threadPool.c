@@ -1,7 +1,9 @@
 #include "threadPool.h"
 #include <stdlib.h>     //malloc()
+#include <string.h>     //memset()
 #include <stdio.h>      //printf()
-#include <phtread.h>    //phtread
+#include <pthread.h>    //pthread
+#include <unistd.h>     //sleep()
 
 #define NUMBER 2 //一次最多创建线程数量
 
@@ -21,8 +23,8 @@ struct ThreadPool
     int queueFront;    //队头：存数据
     int queueRear;     //队尾：取数据
 
-    phtread_t managerID;   //管理者线程ID
-    phtread_t* threadIDs;  //接收pthread_create传出的 工作的线程ID，指向pthread_t类型的动态数组
+    pthread_t managerID;   //管理者线程ID
+    pthread_t* threadIDs;  //接收pthread_create传出的 工作的线程ID，指向pthread_t类型的动态数组
     int minNum;  //线程池 最小线程数
     int maxNum;  //线程池 最大线程数
     int liveNum; //线程池 存活线程数
@@ -43,11 +45,11 @@ struct ThreadPool
          max：最大线程数。线程池扩容的上限。
          queueCap：任务队列的容量。最多能存放多少个待处理的任务。
 */
-ThreadPool* threadPool(int min, int max, int queueCap)
+ThreadPool* threadPoolCreate(int min, int max, int queueCap)
 {
+    //1.初始化线程池结构体（堆区申请内存）
+    ThreadPool* pool = (ThreadPool*)malloc(sizeof(ThreadPool));
     do{
-        //1.初始化线程池结构体（堆区申请内存）
-        ThreadPool* pool = (ThreadPool*)malloc(sizeof(ThreadPool));
         if(pool == NULL)
         {
             printf("malloc threadPool fail...\n");
@@ -55,13 +57,13 @@ ThreadPool* threadPool(int min, int max, int queueCap)
         }
 
         //2.分配线程ID数组并且清零（堆区申请内存）
-        pool->threadIDs = (phtread_t*)malloc(sizeof(phtread_t) * max);
+        pool->threadIDs = (pthread_t*)malloc(sizeof(pthread_t) * max);
         if(pool->threadIDs == NULL)
         {
             printf("malloc threadIDs fail...\n");
             break;
         }
-        memset(pool->threadIDs, 0, sizeof(phtread_t) * max); //把线程ID这个动态数组清零
+        memset(pool->threadIDs, 0, sizeof(pthread_t) * max); //把线程ID这个动态数组清零
         //初始化结构体计数变量
         pool->minNum = min;
         pool->maxNum = max;
@@ -69,8 +71,8 @@ ThreadPool* threadPool(int min, int max, int queueCap)
         pool->busyNum = 0;
         pool->exitNum = 0;
         //初始化互斥锁和条件变量
-        int ret1 = phtread_mutex_init(&pool->mutexPool, NULL);
-        int ret2 = phtread_mutex_init(&pool->mutexBusy, NULL);
+        int ret1 = pthread_mutex_init(&pool->mutexPool, NULL);
+        int ret2 = pthread_mutex_init(&pool->mutexBusy, NULL);
         int ret3 = pthread_cond_init(&pool->notFull, NULL);
         int ret4 = pthread_cond_init(&pool->notEmpty, NULL);
         if(ret1 != 0 || ret2 != 0 || ret3 != 0 || ret4 != 0)
@@ -85,12 +87,12 @@ ThreadPool* threadPool(int min, int max, int queueCap)
         pool->queueFront = 0;
         pool->queueRear = 0;
         //初始化是否销毁线程池标志位
-        shutdown = 0;
+        pool->shutdown = 0;
         //3.创建N个任务线程
-        phtread_create(&pool->managerID, NULL, manager, pool);
+        pthread_create(&pool->managerID, NULL, manager, pool);
         for(int i = 0; i < min; i++)
         {
-            phtread_create(&pool->threadIDs, NULL, worker, pool);
+            pthread_create(&pool->threadIDs[i], NULL, worker, pool);
         }
         //创建成功直接返回
         return pool;
@@ -116,7 +118,7 @@ ThreadPool* threadPool(int min, int max, int queueCap)
 函数作用：销毁线程池
 参数含义：pool待销毁的线程池
 */
-int threadPoolDestory(ThreadPool* pool)
+int threadPoolDestroy(ThreadPool* pool)
 {
     //如果pool为空直接返回
     if(pool == NULL)
@@ -165,7 +167,7 @@ int threadPoolDestory(ThreadPool* pool)
 void threadPoolAdd(ThreadPool* pool, void(*func)(void*), void* arg)
 {
     //1.锁住整个线程池
-    phtread_mutex_lock(&pool->mutexPool);
+    pthread_mutex_lock(&pool->mutexPool);
     //2.若任务队列满，则等待有空位置
     while(pool->queueSize == pool->queueCapacity && pool->shutdown == 0)
     {
@@ -226,7 +228,7 @@ void* worker(void* arg)
     ThreadPool* pool = (ThreadPool*)arg; //void*类型改为ThreadPool*:内存中数据没变，只是读取方式变了
     while(1)
     {
-        phtread_mutex_lock(&pool->mutexPool);
+        pthread_mutex_lock(&pool->mutexPool);
         //当前任务队列是否为空
         while(pool->queueSize == 0 && pool->shutdown == 0)
         {
@@ -240,7 +242,7 @@ void* worker(void* arg)
                 if(pool->liveNum > pool->minNum)
                 {
                     pool->liveNum--;
-                    phtread_mutex_unlock(&pool->mutexPool);
+                    pthread_mutex_unlock(&pool->mutexPool);
                     //销毁线程
                     threadExit(pool);
                 }
@@ -312,7 +314,7 @@ void* manager(void* arg)
                 //遍历threadIDs数组，找到空位，值为0
                 if(pool->threadIDs[i] == 0)
                 {
-                    phtread_create(&pool->threadIDs[i], NULL, worker, pool);
+                    pthread_create(&pool->threadIDs[i], NULL, worker, pool);
                     counter++;
                     pool->liveNum++;
                 }
@@ -320,7 +322,7 @@ void* manager(void* arg)
             pthread_mutex_unlock(&pool->mutexPool);
         }
         //3.缩容机制: 忙线程数×2 < 存活线程数(空闲线程太多)，且存活线程数 > 最小线程数
-        if (busyNum * 2 < liveNum && liveNum > pool->minNum)
+        if (abusyNum * 2 < aliveNum && aliveNum > pool->minNum)
         {
             pthread_mutex_lock(&pool->mutexPool);
             pool->exitNum = NUMBER;
@@ -352,7 +354,30 @@ void threadExit(ThreadPool* pool)
     pthread_exit(NULL);
 }
 
+/*----------------------------测试代码-----------------------------*/
+
+/*
+任务函数: 每个任务打印自己的线程 ID 和参数，然后 sleep(1) 模拟耗时操作
+*/
+void taskFunc(void* arg)
+{
+    int* tmp = (int*)arg;
+    printf("thread %ld is working, number = %d\n", pthread_self(), *tmp);
+    sleep(1);  // 模拟耗时 1 秒的业务
+}
+
 int main()
 {
+    //创建线程池: 初始化3个线程，最大扩容10个，任务队列容量100
+    ThreadPool* pool = threadPoolCreate(3, 10, 100);
+    for (int i = 0; i < 100; i++)
+    {
+        int* num = (int*)malloc(sizeof(int));
+        *num = i + 100; //每个任务分配一块堆内存
+        threadPoolAdd(pool, taskFunc, num); //只在队列满时才阻塞。队列容量100，所以这100个任务瞬间全部入队
+    }
+    sleep(30); //主线程进入休眠，把 CPU 让给工作线程和管理者线程
 
+    threadPoolDestroy(pool);
+    return 0;
 }

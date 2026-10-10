@@ -26,6 +26,7 @@ int main(int argc, char* argv[])
     //1.创建socket套接字
     lfd = socket(AF_INET, SOCK_STREAM, 0); 
 
+    //给监听套接字设置端口复用选项。这是所有正式服务器代码的标配
     int opt = 1;
     setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
